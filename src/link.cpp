@@ -1,12 +1,14 @@
 // #include "shadow_path.h"
 #include "funcs.h"
 #include <string.h>
+#include <cstdlib>
 using namespace FishHook;
 
 #include <sys/socket.h>
 #include <iostream>
 #include <arpa/inet.h>
-
+#include <vector>
+#include <sstream>
 
 int mygetnameinfo(const struct sockaddr * addr, socklen_t addrlen,
                        char * host, socklen_t hostlen,
@@ -17,9 +19,35 @@ int mygetnameinfo(const struct sockaddr * addr, socklen_t addrlen,
 rl_hook(getnameinfo)
 
 
+
+std::vector<std::string> splitString(const std::string & str, const char separator) {
+    std::stringstream sstream(str);
+    std::vector<std::string> output_array = {};
+    std::string val;
+    
+    while (std::getline(sstream, val, separator)) {
+        output_array.push_back(val);
+    }
+    return output_array;
+}
+
+bool isinOverride(const char * node, const char * overrides) {
+    // split overrides in ;
+    const auto & node_s = std::string(node);
+    const auto & overrides_s = std::string(overrides);
+    auto splittedArray = splitString(overrides_s, ';');
+    for (const auto & v : splittedArray) {
+        if (node_s.compare(v)==0){
+            return true;
+        }
+    }
+    return false;
+}
+
 int mygetaddrinfo(const char * node, const char * service, const struct addrinfo * hints, struct addrinfo ** res) {
     auto status = CallOld<Name_getaddrinfo>(node, service, hints, res);
-    if (res != nullptr && !strcmp(node, "trends.google.com")) {
+    const char * overrides = std::getenv("LOCALHOST_OVERRIDES");
+    if (res != nullptr and overrides != nullptr and isinOverride(node, overrides)) {
         struct addrinfo * resref = *res;
         void * ptr;
         switch (resref->ai_family)
